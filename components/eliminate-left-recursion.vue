@@ -1,0 +1,295 @@
+<template>
+  <div class="all">
+    <div class="first">
+      <div class="button">
+        <div v-if="hasImmedationRecursionProduction&&!hasIndirectRecursionProduction">
+          <el-button type="success" @click="eliminateImmedationRecursion" v-if="!allDone()">消除立即左递归</el-button>
+        </div>
+        <div v-else-if="hasIndirectRecursionProduction">
+          <el-button type="success" @click="eliminateEmptyProductions" v-if="!allDone()">消除 ε 产生式</el-button>
+        </div>
+      </div>
+      <div v-if="hasImmedationRecursionProduction||hasIndirectRecursionProduction">
+        <div class="top">
+          <HighlightProduction :productions="immedationRecursionProductions" title="当前文法中的立即左递归"></HighlightProduction>
+          <h3 v-if="!hasImmedationRecursionProduction">无</h3>
+        </div>
+        <div class="bottom">
+          <HighlightProduction
+            :disjointSet="indirectRecursionDisjointSet"
+            :productions="indirectRecursionProductions"
+            title="当前文法中的间接左递归和环"
+          ></HighlightProduction>
+          <h3 v-if="!hasIndirectRecursionProduction">无</h3>
+        </div>
+      </div>
+      <div v-else>
+        <h2>当前文法中无左递归</h2>
+      </div>
+    </div>
+    <div class="second" v-show="second">
+      <div class="button">
+        <el-button type="warning" @click="eliminateCycles" v-if="!allDone()">消除环</el-button>
+      </div>
+      <div style="margin-top:10px">
+        <HighlightProduction :productions="EEGProductions" title="消除ε产生式后的文法"></HighlightProduction>
+      </div>
+    </div>
+    <div class="thrid" v-show="thrid">
+      <div class="button">
+        <el-button type="info" @click="eliminateLeftRecursion" v-if="!allDone()">消除左递归</el-button>
+      </div>
+      <div style="margin-top:10px">
+        <HighlightProduction :productions="ECGProductions" title="消除环后的文法"></HighlightProduction>
+      </div>
+    </div>
+    <div class="fourth" v-show="fourth">
+      <div style="margin-top:10px">
+        <HighlightProduction :productions="ELRGProductions" :title="titleMessage"></HighlightProduction>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import ELR from "~/classes/algorithms/eliminate-left-recursion";
+import HighlightProduction from "~/components/highlight-production";
+import Grammar from "~/classes/grammar";
+import DisjointSet from "~/classes/disjoint-set";
+import Production from "~/classes/production";
+export default {
+  layout: "grammar",
+  components: {
+    HighlightProduction
+  },
+  data() {
+    return {
+      grammar: new Grammar(),
+      ELR: null,
+      immedationRecursionProductions: null,
+      hasImmedationRecursionProduction: false,
+      indirectRecursionProductions: [],
+      indirectRecursionDisjointSet: "",
+      hasIndirectRecursionProduction: false,
+      grammarProductions: null,
+      EEGProductions: null,
+      ECGProductions: null,
+      ELRGProductions: null,
+      buttonMessage: "完成",
+      second: false,
+      thrid: false,
+      fourth: false,
+      titleMessage: ""
+    };
+  },
+  methods: {
+    allDone() {
+      if (this.hasIndirectRecursionProduction) {
+        if (this.second && this.thrid && this.fourth) {
+          this.$message("消除左递归完成");
+          return true;
+        } else {
+          return false;
+        }
+      } else if (this.hasImmedationRecursionProduction) {
+        if (!this.second && !this.thrid && this.fourth) {
+          this.$message("消除左递归完成");
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        return true;
+      }
+    },
+    eliminateImmedationRecursion() {
+      this.second = false;
+      this.thrid = false;
+      this.fourth = true;
+      this.titleMessage = "消除立即左递归后的文法";
+    },
+    eliminateEmptyProductions() {
+      this.second = true;
+    },
+    eliminateCycles() {
+      this.second = true;
+      this.thrid = true;
+    },
+    eliminateLeftRecursion() {
+      this.second = true;
+      this.thrid = true;
+      this.fourth = true;
+      this.titleMessage = "消除左递归后的文法";
+    },
+    changeButton() {
+      if (this.buttonMessage === "完成") {
+        this.$eventbus.$emit("FinishEliminateLeftRecursion");
+        return;
+      }
+    },
+    setGrammar(grammar) {
+      this.grammar = grammar;
+      this.ELR = new ELR(this.grammar);
+      this.immedationRecursionProductions = this.ELR.immedationRecursion;
+      this.grammarProductions = this.grammar.getProductions();
+      this.EEGProductions = this.ELR.eliminatingEmptyGrammar.getProductions();
+      this.ECGProductions = this.ELR.eliminatingCyclesGrammar.getProductions();
+      this.ELRGProductions = this.ELR.eliminateLeftRecursionGrammar.getProductions();
+      this.indirectRecursionProductions = []; // data 只会在组件创建的时候初始化一次！！！！！
+      const disjointSet = new DisjointSet();
+      for (const item of this.ELR.indirectRecursion) {
+        const tempProduction0 = new Production(
+          item[0].getHead(),
+          item[0].getBody()
+        );
+        this.indirectRecursionProductions.push(tempProduction0);
+        disjointSet.add(tempProduction0);
+        for (let i = 1; i < item.length; i++) {
+          const tempProduction = new Production(
+            item[i].getHead(),
+            item[i].getBody()
+          );
+          this.indirectRecursionProductions.push(tempProduction);
+          disjointSet.add(tempProduction);
+          disjointSet.disjoint(tempProduction0, tempProduction);
+        }
+      }
+      this.indirectRecursionDisjointSet = disjointSet;
+      disjointSet.print();
+      if (this.immedationRecursionProductions.length > 0) {
+        this.hasImmedationRecursionProduction = true;
+      }
+      if (this.indirectRecursionProductions.length > 0) {
+        // 当前文法含有间接左递归
+        this.hasIndirectRecursionProduction = true;
+      }
+    }
+  },
+  _test() {
+    let grammar = new Grammar();
+    const E = grammar.getSign("E", "Nonterminal");
+    // const E1 = grammar.getSign("E'", "Nonterminal");
+    const T = grammar.getSign("T", "Nonterminal");
+    // const T1 = grammar.getSign("T'", "Nonterminal");
+    const F = grammar.getSign("F", "Nonterminal");
+    const Plus = grammar.getSign("+", "Terminal");
+    const Multi = grammar.getSign("*", "Terminal");
+    const Id = grammar.getSign("id", "Terminal");
+    const LeftClose = grammar.getSign("(", "Terminal");
+    const RightClose = grammar.getSign(")", "Terminal");
+    const G = grammar.getSign("G", "Nonterminal");
+    const Empty = grammar.getEmptySign();
+    grammar.setStartSign(E);
+    //@test只有立即左递归的文法
+    grammar.addProduction(E, [T]);
+    grammar.addProduction(E, [E, Plus, T]);
+    grammar.addProduction(T, [F]);
+    grammar.addProduction(T, [T, Multi, F]);
+    grammar.addProduction(F, [LeftClose, E, RightClose]);
+    grammar.addProduction(F, [Id]);
+    //@test间接左递归文法
+    // grammar.addProduction(E, [T, Plus]);
+    // grammar.addProduction(E, [Multi]);
+    // grammar.addProduction(T, [T, Plus]);
+    // grammar.addProduction(T, [E, Multi]);
+    // grammar.addProduction(T, [Empty]);
+    //@test加间接左递归E=>T=>F=>E
+    grammar.addProduction(F, [E]);
+    //@test加间接左递归T=>F=>T
+    // grammar.addProduction(F, [T]);
+    //@test加间接左递归E=>T=>E
+    // grammar.addProduction(T, [E]);
+    //@test加包含ε的间接左递归T=>GE=>E G=>ε
+    grammar.addProduction(T, [G, E]);
+    grammar.addProduction(G, [Id]);
+    grammar.addProduction(G, [Empty]);
+    //@test加包含ε的间接左递归T=>GF=>E G=>ε
+    // grammar.addProduction(T, [G, F]);
+    // grammar.addProduction(G, [Empty]);
+    // grammar.addProduction(F, [E]);
+    //@test加包含ε的产生式T=>G G=>ε
+    // grammar.addProduction(T, [G]);
+    //@test加包含ε的间接左递归T=>GGGGE=>E G=>ε
+    // grammar.addProduction(T, [G, G, G, G, E]);
+    this.grammar = grammar;
+    this.ELR = new ELR(this.grammar);
+
+    this.immedationRecursionProductions = this.ELR.immedationRecursion;
+    this.grammarProductions = this.grammar.getProductions();
+    this.EEGProductions = this.ELR.eliminatingEmptyGrammar.getProductions();
+    this.ECGProductions = this.ELR.eliminatingCyclesGrammar.getProductions();
+    this.ELRGProductions = this.ELR.eliminateLeftRecursionGrammar.getProductions();
+    const disjointSet = new DisjointSet();
+    for (const item of this.ELR.indirectRecursion) {
+      const tempProduction0 = new Production(
+        item[0].getHead(),
+        item[0].getBody()
+      );
+      this.indirectRecursionProductions.push(tempProduction0);
+      disjointSet.add(tempProduction0);
+      for (let i = 1; i < item.length; i++) {
+        const tempProduction = new Production(
+          item[i].getHead(),
+          item[i].getBody()
+        );
+        this.indirectRecursionProductions.push(tempProduction);
+        disjointSet.disjoint(tempProduction0, tempProduction);
+      }
+    }
+    this.indirectRecursionDisjointSet = disjointSet;
+    if (this.immedationRecursionProductions.length > 0) {
+      this.hasImmedationRecursionProduction = true;
+    }
+    if (this.indirectRecursionProductions.length > 0) {
+      this.hasIndirectRecursionProduction = true;
+    }
+    this.changeButton();
+    this.changeButton();
+    this.changeButton();
+    this.changeButton();
+  }
+};
+</script>
+<style lang="scss" scoped>
+.all {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  .first {
+    flex: 0 1 auto;
+    margin-top: 20px;
+
+    .top {
+      margin-top: 10px;
+      h3 {
+        margin-top: 10px;
+        text-align: center;
+      }
+    }
+    .bottom {
+      margin-top: 20px;
+      h3 {
+        margin-top: 10px;
+        text-align: center;
+      }
+    }
+  }
+  .second {
+    margin-top: 20px;
+    flex: 0 1 auto;
+  }
+  .thrid {
+    margin-top: 20px;
+    flex: 0 1 auto;
+  }
+  .fourth {
+    margin-top: 20px;
+    flex: 0 1 auto;
+  }
+  .button {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+  }
+}
+</style>
+

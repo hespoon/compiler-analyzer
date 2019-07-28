@@ -1,0 +1,29 @@
+{
+  "name": "compiler-analyzer",
+  "version": "1.0.0",
+  "description": "My grand Nuxt.js project",
+  "author": "imyxz",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt",
+    "build:gh_pages": "cross-env DEPLOY_ENV=GH_PAGES nuxt build",
+    "start": "nuxt start",
+    "generate:gh_pages": "cross-env DEPLOY_ENV=GH_PAGES nuxt generate",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nuxtjs/axios": "^5.3.6",
+    "cross-env": "^5.2.0",
+    "element-ui": "^2.4.11",
+    "lodash": "^4.17.11",
+    "node-sass": "^4.11.0",
+    "nuxt": "^2.4.0",
+    "sass": "^1.18.0",
+    "sass-loader": "^7.1.0",
+    "vue-codemirror-lite": "^1.0.4"
+  },
+  "devDependencies": {
+    "jest": "^24.8.0",
+    "nodemon": "^1.18.9"
+  }
+}
